@@ -69,7 +69,7 @@ function Router() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="student-hub-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="student-hub-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />

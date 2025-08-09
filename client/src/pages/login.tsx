@@ -116,7 +116,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <Tabs defaultValue="team" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="team">Team Login</TabsTrigger>
-              <TabsTrigger value="admin">Admin Login</TabsTrigger>
+              <TabsTrigger value="admin">W.'s Login</TabsTrigger>
             </TabsList>
             
             <TabsContent value="team" className="mt-6">
@@ -170,13 +170,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             <TabsContent value="admin" className="mt-6">
               <form onSubmit={handleAdminLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="adminPassword">Admin Password</Label>
+                  <Label htmlFor="adminPassword">W.'s Password</Label>
                   <Input
                     id="adminPassword"
                     type="password"
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Enter admin password"
+                    placeholder="Enter W.'s password"
                     required
                   />
                 </div>
@@ -194,7 +194,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   ) : (
                     <>
                       <LogIn className="w-4 h-4 mr-2" />
-                      Login as Admin
+                      Login as W.
                     </>
                   )}
                 </Button>

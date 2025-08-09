@@ -35,6 +35,7 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
   const [tagList, setTagList] = useState<string[]>([]);
+  const [isVisible, setIsVisible] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -45,12 +46,18 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const res = await apiRequest("POST", "/api/files/upload", null);
-      return fetch("/api/files/upload", {
+      const response = await fetch("/api/files/upload", {
         method: "POST",
         body: formData,
         credentials: "include",
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `HTTP ${response.status}: ${error.message || 'Upload failed'}`);
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -64,6 +71,7 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
       setTags("");
       setDescription("");
       setTagList([]);
+      setIsVisible(true);
       // Invalidate cache and switch to gallery
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
       onUploadSuccess();
@@ -150,6 +158,11 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
     formData.append('assignment', assignment);
     formData.append('tags', [...tagList, ...tags.split(',').map(t => t.trim()).filter(t => t)].join(','));
     formData.append('description', description);
+    
+    // Add visibility for admin files
+    if (user?.isAdmin) {
+      formData.append('isVisible', isVisible.toString());
+    }
 
     uploadMutation.mutate(formData);
   };
@@ -233,12 +246,22 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
               />
             </div>
 
-            {/* Team Number Display */}
-            {user && (
+            {/* Team Number Display - Hidden for Admin */}
+            {user && !user.isAdmin && (
               <div className="space-y-2">
                 <Label>Your Team</Label>
                 <div className="px-3 py-2 bg-muted rounded-md text-sm text-muted-foreground">
                   Team {user.teamNumber}
+                </div>
+              </div>
+            )}
+            
+            {/* Admin Note */}
+            {user?.isAdmin && (
+              <div className="space-y-2">
+                <Label>Upload As</Label>
+                <div className="px-3 py-2 bg-primary/10 rounded-md text-sm text-primary border border-primary/20">
+                  W.'s Files (for class presentations)
                 </div>
               </div>
             )}
@@ -299,6 +322,27 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
                 className="resize-none"
               />
             </div>
+            
+            {/* Visibility Toggle for Admin */}
+            {user?.isAdmin && (
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isVisible"
+                    checked={isVisible}
+                    onChange={(e) => setIsVisible(e.target.checked)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="isVisible" className="text-sm">
+                    Visible to students (default: checked)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Uncheck to hide from students initially. You can change this later.
+                </p>
+              </div>
+            )}
 
             {/* Submit Button */}
             <Button 

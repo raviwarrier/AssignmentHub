@@ -187,10 +187,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Assignment settings routes
-  app.get("/api/assignment-settings", requireAdmin, async (req, res) => {
+  app.get("/api/assignment-settings", requireAuth, async (req, res) => {
     try {
+      const user = req.session.user!;
       const settings = await storage.getAssignmentSettings();
-      res.json(settings);
+      
+      if (user.isAdmin) {
+        // Admin gets all settings
+        res.json(settings);
+      } else {
+        // Students only get the assignment names and open view status (not edit capabilities)
+        res.json(settings.map(setting => ({
+          assignment: setting.assignment,
+          isOpenView: setting.isOpenView
+        })));
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to retrieve assignment settings" });
     }
@@ -240,7 +251,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
         files = files.filter(file => 
           file.teamNumber === user.teamNumber || // Own team's files
-          openAssignments.includes(file.assignment) // Open view assignments
+          openAssignments.includes(file.assignment) || // Open view assignments
+          (file.teamNumber === 0 && file.isVisible === "true") // Visible admin files
         );
       }
       
@@ -257,11 +269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No files uploaded" });
       }
 
-      const { label, assignment, tags, description } = req.body;
+      const { label, assignment, tags, description, isVisible } = req.body;
       const user = req.session.user!;
       
-      // Use logged-in user's team number
-      const teamNumber = user.teamNumber;
+      // Admin users get assigned to Team 0, others use their actual team number
+      const teamNumber = user.isAdmin ? 0 : user.teamNumber;
       
       // Parse tags if it's a string
       let parsedTags = [];
@@ -283,6 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assignment,
           tags: parsedTags,
           description: description || null,
+          isVisible: user.isAdmin ? (isVisible || "true") : "true",
         };
 
         const result = insertFileSchema.safeParse(fileData);
@@ -318,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignmentSetting = await storage.getAssignmentSetting(file.assignment);
         const isOpenView = assignmentSetting && assignmentSetting.isOpenView === "true";
         
-        if (file.teamNumber !== user.teamNumber && !isOpenView) {
+        if (file.teamNumber !== user.teamNumber && !isOpenView && !(file.teamNumber === 0 && file.isVisible === "true")) {
           return res.status(403).json({ message: "Access denied" });
         }
       }
@@ -367,6 +380,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Delete all files error:', error);
       res.status(500).json({ message: "Failed to delete all files" });
+    }
+  });
+
+  // Update file visibility (admin only)
+  app.put("/api/files/:id/visibility", requireAuth, async (req, res) => {
+    try {
+      const user = req.session.user!;
+      if (!user.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { isVisible } = req.body;
+      const file = await storage.getFileById(req.params.id);
+      
+      if (!file) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Only allow admin to modify their own files (team 0)
+      if (file.teamNumber !== 0) {
+        return res.status(403).json({ message: "Can only modify your own files" });
+      }
+
+      // Update file visibility using the storage method we'll need to add
+      const updated = await storage.updateFileVisibility(req.params.id, isVisible);
+      if (!updated) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      res.json({ message: "File visibility updated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update file visibility" });
+    }
+  });
+
+  // Update file details (admin only for their files)
+  app.put("/api/files/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const { label, description, tags } = req.body;
+      const file = await storage.getFileById(req.params.id);
+      
+      if (!file) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Only allow admin to modify their own files (team 0) or let users modify their own files
+      if (file.teamNumber !== user.teamNumber && !(user.isAdmin && file.teamNumber === 0)) {
+        return res.status(403).json({ message: "Can only modify your own files" });
+      }
+
+      const updated = await storage.updateFileDetails(req.params.id, { label, description, tags });
+      if (!updated) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      res.json({ message: "File updated successfully", file: updated });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update file" });
     }
   });
 

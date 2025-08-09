@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import UploadSection from "@/components/upload-section";
 import FileGallery from "@/components/file-gallery";
+import OtherTeamFiles from "@/components/other-team-files";
+import AdminFilesManager from "@/components/admin-files-manager";
 import AdminModal from "@/components/admin-modal";
 import AdminSettingsModal from "@/components/admin-settings-modal";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<"upload" | "gallery">("upload");
+  const [currentView, setCurrentView] = useState<"upload" | "team-files" | "other-files" | "admin-files">("upload");
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const { toast } = useToast();
@@ -82,16 +84,45 @@ export default function Home() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCurrentView("gallery")}
+                  onClick={() => setCurrentView("team-files")}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md ${
-                    currentView === "gallery" 
+                    currentView === "team-files" 
                       ? "bg-background text-foreground shadow-sm" 
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Grid3X3 className="w-4 h-4 mr-2" />
-                  Gallery
+                  {user?.isAdmin ? "Team Files" : "Your Files"}
                 </Button>
+                {user?.isAdmin ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentView("admin-files")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                      currentView === "admin-files" 
+                        ? "bg-background text-foreground shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Grid3X3 className="w-4 h-4 mr-2" />
+                    W.'s Files
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentView("other-files")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md opacity-75 ${
+                      currentView === "other-files" 
+                        ? "bg-background text-foreground shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Grid3X3 className="w-4 h-4 mr-2" />
+                    Other Team Files
+                  </Button>
+                )}
               </div>
               
               {/* Theme Toggle */}
@@ -140,13 +171,25 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === "upload" && (
           <div className="animate-fade-in">
-            <UploadSection onUploadSuccess={() => setCurrentView("gallery")} />
+            <UploadSection onUploadSuccess={() => setCurrentView("team-files")} />
           </div>
         )}
         
-        {currentView === "gallery" && (
+        {currentView === "team-files" && (
           <div className="animate-fade-in">
             <FileGallery onUploadClick={() => setCurrentView("upload")} />
+          </div>
+        )}
+        
+        {currentView === "other-files" && (
+          <div className="animate-fade-in">
+            <OtherTeamFiles />
+          </div>
+        )}
+        
+        {currentView === "admin-files" && (
+          <div className="animate-fade-in">
+            <AdminFilesManager />
           </div>
         )}
       </main>

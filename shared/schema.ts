@@ -14,6 +14,7 @@ export const files = pgTable("files", {
   assignment: text("assignment").notNull(),
   tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
   description: text("description"),
+  isVisible: text("is_visible").notNull().default("true"), // for admin files visibility control
   uploadedAt: timestamp("uploaded_at").notNull().default(sql`now()`),
 });
 
