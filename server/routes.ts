@@ -232,9 +232,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('DEBUG: Teams endpoint called');
     try {
       console.log('DEBUG: About to call storage.getAllUsers()');
-      const users = await storage.getAllUsers();
-      console.log('DEBUG: Raw users from storage:', users);
-      console.log('DEBUG: Users is array?', Array.isArray(users));
+      let users = [];
+      
+      try {
+        users = await storage.getAllUsers();
+        console.log('DEBUG: Raw users from storage:', users);
+        console.log('DEBUG: Users is array?', Array.isArray(users));
+      } catch (error) {
+        console.log('DEBUG: No users found, returning empty array:', error.message);
+        return res.json([]);
+      }
       
       if (!Array.isArray(users)) {
         console.error('DEBUG: Users is not an array!');
@@ -371,56 +378,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Confirmation text incorrect" });
       }
 
-      // Get all files
-      const allFiles = await storage.getAllFiles();
-      
-      // Delete all files from disk
-      const uploadDir = path.join(process.cwd(), 'uploads');
+      // Check what data exists first
+      let allFiles = [];
+      let allUsers = [];
+      let hasAssignments = false;
+
+      try {
+        allFiles = await storage.getAllFiles();
+      } catch (error) {
+        console.log('No files to delete or error fetching files:', error.message);
+        allFiles = [];
+      }
+
+      try {
+        allUsers = await storage.getAllUsers();
+        // Filter out admin from count
+        allUsers = allUsers.filter(user => user.teamNumber !== 0);
+      } catch (error) {
+        console.log('No users to delete or error fetching users:', error.message);
+        allUsers = [];
+      }
+
+      // Check if assignment settings exist
+      try {
+        const assignments = await storage.getAllAssignmentSettings();
+        hasAssignments = assignments && assignments.length > 0;
+      } catch (error) {
+        console.log('No assignment settings to reset or error fetching settings:', error.message);
+        hasAssignments = false;
+      }
+
+      // If everything is empty, return early with appropriate message
+      if (allFiles.length === 0 && allUsers.length === 0 && !hasAssignments) {
+        return res.json({ 
+          message: "No data to reset - server is already clean",
+          filesDeleted: 0,
+          usersDeleted: 0,
+          assignmentsReset: 0,
+          details: "No files, users, or assignment settings found in the database."
+        });
+      }
+
       let filesDeleted = 0;
-      
-      for (const file of allFiles) {
-        const filePath = path.join(uploadDir, file.fileName);
-        try {
-          await fs.unlink(filePath);
-          filesDeleted++;
-        } catch (error) {
-          console.error(`Failed to delete file from disk: ${file.fileName}`, error);
-        }
-        await storage.deleteFile(file.id);
-      }
-
-      // Reset assignment settings to default (all closed)
-      const assignments = [
-        "Assignment 1 - Segmentation and Personas",
-        "Assignment 2 - Positioning", 
-        "Assignment 3 - Journey Mapping",
-        "Assignment 4 - Marketing Channels",
-        "Assignment 5 - Pricing",
-        "Assignment 6 - Distribution Channels",
-        "Assignment 7 - Acquisition",
-        "Assignment 8 - Customer Discovery",
-        "Assignment 9 - Product Validation"
-      ];
-      
-      for (const assignment of assignments) {
-        await storage.updateAssignmentSetting(assignment, false);
-      }
-
-      // Delete all users (except admin)
-      const allUsers = await storage.getAllUsers();
       let usersDeleted = 0;
-      for (const user of allUsers) {
-        if (user.teamNumber !== 0) { // Don't delete admin
-          const deleted = await storage.deleteUser(user.teamNumber);
-          if (deleted) usersDeleted++;
+      let assignmentsReset = 0;
+
+      // Delete files if any exist
+      if (allFiles.length > 0) {
+        const uploadDir = path.join(process.cwd(), 'uploads');
+        
+        for (const file of allFiles) {
+          const filePath = path.join(uploadDir, file.fileName);
+          try {
+            await fs.unlink(filePath);
+            filesDeleted++;
+          } catch (error) {
+            console.error(`Failed to delete file from disk: ${file.fileName}`, error);
+          }
+          try {
+            await storage.deleteFile(file.id);
+          } catch (error) {
+            console.error(`Failed to delete file from database: ${file.id}`, error);
+          }
         }
       }
+
+      // Delete users if any exist (except admin)
+      if (allUsers.length > 0) {
+        for (const user of allUsers) {
+          try {
+            const deleted = await storage.deleteUser(user.teamNumber);
+            if (deleted) usersDeleted++;
+          } catch (error) {
+            console.error(`Failed to delete user ${user.teamNumber}:`, error);
+          }
+        }
+      }
+
+      // Reset assignment settings to default (all closed) if any exist
+      if (hasAssignments) {
+        const assignments = [
+          "Assignment 1 - Segmentation and Personas",
+          "Assignment 2 - Positioning", 
+          "Assignment 3 - Journey Mapping",
+          "Assignment 4 - Marketing Channels",
+          "Assignment 5 - Pricing",
+          "Assignment 6 - Distribution Channels",
+          "Assignment 7 - Acquisition",
+          "Assignment 8 - Customer Discovery",
+          "Assignment 9 - Product Validation"
+        ];
+        
+        for (const assignment of assignments) {
+          try {
+            await storage.updateAssignmentSetting(assignment, false);
+            assignmentsReset++;
+          } catch (error) {
+            console.error(`Failed to reset assignment setting: ${assignment}`, error);
+          }
+        }
+      }
+
+      // Prepare response message
+      const actions = [];
+      if (filesDeleted > 0) actions.push(`${filesDeleted} files deleted`);
+      if (usersDeleted > 0) actions.push(`${usersDeleted} users deleted`);
+      if (assignmentsReset > 0) actions.push(`${assignmentsReset} assignments reset`);
+
+      const message = actions.length > 0 
+        ? `Server reset successful: ${actions.join(', ')}`
+        : "Server reset completed - no data needed to be cleared";
 
       res.json({ 
-        message: "Server reset successful - all files and data cleared",
+        message,
         filesDeleted,
         usersDeleted,
-        assignmentsReset: assignments.length
+        assignmentsReset,
+        details: actions.length > 0 ? `Processed: ${actions.join(', ')}` : "No data required processing"
       });
     } catch (error) {
       console.error('Server reset error:', error);
@@ -494,7 +568,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/assignment-settings", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      const settings = await storage.getAssignmentSettings();
+      let settings = [];
+      
+      try {
+        settings = await storage.getAssignmentSettings();
+      } catch (error) {
+        console.log('No assignment settings found, returning empty array:', error.message);
+        settings = [];
+      }
       
       if (user.isAdmin) {
         // Admin gets all settings
@@ -507,7 +588,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })));
       }
     } catch (error) {
-      res.status(500).json({ message: "Failed to retrieve assignment settings" });
+      console.error('Assignment settings error:', error);
+      res.status(500).json({ message: "Failed to retrieve assignment settings", error: error.message });
     }
   });
   
