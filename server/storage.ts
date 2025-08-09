@@ -29,8 +29,10 @@ export interface IStorage {
   
   // Assignment settings operations
   getAssignmentSettings(): Promise<AssignmentSettings[]>;
+  getAllAssignmentSettings(): Promise<AssignmentSettings[]>;
   getAssignmentSetting(assignment: string): Promise<AssignmentSettings | undefined>;
   updateAssignmentSetting(assignment: string, isOpenView: boolean): Promise<AssignmentSettings>;
+  initializeDefaultAssignmentSettings(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -215,6 +217,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.assignmentSettings.values());
   }
 
+  async getAllAssignmentSettings(): Promise<AssignmentSettings[]> {
+    return this.getAssignmentSettings();
+  }
+
   async getAssignmentSetting(assignment: string): Promise<AssignmentSettings | undefined> {
     return this.assignmentSettings.get(assignment);
   }
@@ -237,6 +243,27 @@ export class MemStorage implements IStorage {
     }
     this.assignmentSettings.set(assignment, setting);
     return setting;
+  }
+
+  async initializeDefaultAssignmentSettings(): Promise<void> {
+    // Only initialize if empty
+    if (this.assignmentSettings.size === 0) {
+      const defaultAssignments = [
+        "Assignment 1 - Segmentation and Personas",
+        "Assignment 2 - Positioning", 
+        "Assignment 3 - Journey Mapping",
+        "Assignment 4 - Marketing Channels",
+        "Assignment 5 - Pricing",
+        "Assignment 6 - Distribution Channels",
+        "Assignment 7 - Acquisition",
+        "Assignment 8 - Customer Discovery",
+        "Assignment 9 - Product Validation"
+      ];
+      
+      for (const assignment of defaultAssignments) {
+        await this.updateAssignmentSetting(assignment, false);
+      }
+    }
   }
 }
 
@@ -388,6 +415,10 @@ class DBStorage implements IStorage {
     return await this.db.select().from(assignmentSettings);
   }
 
+  async getAllAssignmentSettings(): Promise<AssignmentSettings[]> {
+    return this.getAssignmentSettings();
+  }
+
   async getAssignmentSetting(assignment: string): Promise<AssignmentSettings | undefined> {
     const result = await this.db.select().from(assignmentSettings).where(eq(assignmentSettings.assignment, assignment)).limit(1);
     return result[0];
@@ -415,17 +446,74 @@ class DBStorage implements IStorage {
       return result[0];
     }
   }
-}
 
-// Initialize storage with fallback mechanism
-function createStorage(): IStorage {
-  try {
-    return new DBStorage();
-  } catch (error) {
-    console.log("🔄 Using memory storage for development (database not accessible)");
-    console.log("📝 DEPLOYMENT NOTE: This will automatically use PostgreSQL when deployed on server");
-    return new MemStorage();
+  async initializeDefaultAssignmentSettings(): Promise<void> {
+    // Only initialize if table is empty
+    const existing = await this.getAssignmentSettings();
+    if (existing.length === 0) {
+      const defaultAssignments = [
+        "Assignment 1 - Segmentation and Personas",
+        "Assignment 2 - Positioning", 
+        "Assignment 3 - Journey Mapping",
+        "Assignment 4 - Marketing Channels",
+        "Assignment 5 - Pricing",
+        "Assignment 6 - Distribution Channels",
+        "Assignment 7 - Acquisition",
+        "Assignment 8 - Customer Discovery",
+        "Assignment 9 - Product Validation"
+      ];
+      
+      for (const assignment of defaultAssignments) {
+        await this.updateAssignmentSetting(assignment, false);
+      }
+    }
   }
 }
 
-export const storage = createStorage();
+// Initialize storage with fallback mechanism
+async function createStorage(): Promise<IStorage> {
+  let storageInstance: IStorage;
+  
+  try {
+    storageInstance = new DBStorage();
+  } catch (error) {
+    console.log("🔄 Using memory storage for development (database not accessible)");
+    console.log("📝 DEPLOYMENT NOTE: This will automatically use PostgreSQL when deployed on server");
+    storageInstance = new MemStorage();
+  }
+  
+  // Initialize default assignment settings on first run
+  try {
+    await storageInstance.initializeDefaultAssignmentSettings();
+  } catch (error) {
+    console.log("Note: Could not initialize assignment settings:", error.message);
+  }
+  
+  return storageInstance;
+}
+
+// Create storage instance (async initialization will happen when first used)
+let storageInstance: IStorage | null = null;
+export const storage = new Proxy({} as IStorage, {
+  get: function(target, prop, receiver) {
+    if (!storageInstance) {
+      // Initialize synchronously for first access, but log a warning
+      try {
+        storageInstance = new DBStorage();
+        // Queue async initialization
+        storageInstance.initializeDefaultAssignmentSettings().catch(err => 
+          console.log("Note: Could not initialize assignment settings:", err.message)
+        );
+      } catch (error) {
+        console.log("🔄 Using memory storage for development (database not accessible)");
+        console.log("📝 DEPLOYMENT NOTE: This will automatically use PostgreSQL when deployed on server");
+        storageInstance = new MemStorage();
+        // Queue async initialization
+        storageInstance.initializeDefaultAssignmentSettings().catch(err => 
+          console.log("Note: Could not initialize assignment settings:", err.message)
+        );
+      }
+    }
+    return (storageInstance as any)[prop];
+  }
+});

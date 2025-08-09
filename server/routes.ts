@@ -455,26 +455,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Reset assignment settings to default (all closed) if any exist
+      // Reset assignment settings to closed (preserve the settings, just reset flags)
       if (hasAssignments) {
-        const assignments = [
-          "Assignment 1 - Segmentation and Personas",
-          "Assignment 2 - Positioning", 
-          "Assignment 3 - Journey Mapping",
-          "Assignment 4 - Marketing Channels",
-          "Assignment 5 - Pricing",
-          "Assignment 6 - Distribution Channels",
-          "Assignment 7 - Acquisition",
-          "Assignment 8 - Customer Discovery",
-          "Assignment 9 - Product Validation"
-        ];
+        const existingAssignments = await storage.getAllAssignmentSettings();
         
-        for (const assignment of assignments) {
+        for (const setting of existingAssignments) {
           try {
-            await storage.updateAssignmentSetting(assignment, false);
+            await storage.updateAssignmentSetting(setting.assignment, false);
             assignmentsReset++;
           } catch (error) {
-            console.error(`Failed to reset assignment setting: ${assignment}`, error);
+            console.error(`Failed to reset assignment setting: ${setting.assignment}`, error);
           }
         }
       }
