@@ -1,7 +1,7 @@
 import { type User, type InsertUser, type File, type InsertFile, type AssignmentSettings, type InsertAssignmentSettings, files, users, assignmentSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 // Note: DB import moved inside DBStorage class to avoid connection issues in dev
-import { eq, like, or } from "drizzle-orm";
+import { eq, like, or, asc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -214,7 +214,7 @@ export class MemStorage implements IStorage {
   
   // Assignment settings operations
   async getAssignmentSettings(): Promise<AssignmentSettings[]> {
-    return Array.from(this.assignmentSettings.values());
+    return Array.from(this.assignmentSettings.values()).sort((a, b) => a.assignment.localeCompare(b.assignment));
   }
 
   async getAllAssignmentSettings(): Promise<AssignmentSettings[]> {
@@ -412,7 +412,7 @@ class DBStorage implements IStorage {
 
   // Assignment settings operations
   async getAssignmentSettings(): Promise<AssignmentSettings[]> {
-    return await this.db.select().from(assignmentSettings);
+    return await this.db.select().from(assignmentSettings).orderBy(asc(assignmentSettings.assignment));
   }
 
   async getAllAssignmentSettings(): Promise<AssignmentSettings[]> {
