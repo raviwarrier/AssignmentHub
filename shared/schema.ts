@@ -30,8 +30,14 @@ export type File = typeof files.$inferSelect;
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teamNumber: integer("team_number").notNull().unique(),
+  teamName: varchar("team_name", { length: 100 }),
+  passwordHash: text("password_hash"),
   isAdmin: text("is_admin").notNull().default("false"),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
   lastLogin: timestamp("last_login"),
+  passwordResetToken: varchar("password_reset_token", { length: 255 }),
+  tokenExpiry: timestamp("token_expiry"),
 });
 
 export const assignmentSettings = pgTable("assignment_settings", {
@@ -43,7 +49,21 @@ export const assignmentSettings = pgTable("assignment_settings", {
 
 export const insertUserSchema = createInsertSchema(users).pick({
   teamNumber: true,
+  teamName: true,
+  passwordHash: true,
   isAdmin: true,
+  isActive: true,
+});
+
+export const registerUserSchema = createInsertSchema(users).pick({
+  teamNumber: true,
+  teamName: true,
+}).extend({
+  teamNumber: z.number().int().min(1, "Team number must be at least 1").max(9, "Team number must be at most 9"),
+  teamName: z.string().optional(),
+  password: z.string().min(12, "Password must be at least 12 characters")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+      "Password must contain uppercase, lowercase, number and special character"),
 });
 
 export const insertAssignmentSettingsSchema = createInsertSchema(assignmentSettings).omit({

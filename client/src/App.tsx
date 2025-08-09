@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
+import AdminSettings from "@/pages/admin-settings";
 import NotFound from "@/pages/not-found";
 import { LoaderIcon } from "lucide-react";
 
@@ -58,6 +59,7 @@ function AuthenticatedApp() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/admin/settings" component={AdminSettings} />
       <Route component={NotFound} />
     </Switch>
   );

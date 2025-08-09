@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { GraduationCap, Upload, Grid3X3, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -6,8 +7,8 @@ import UploadSection from "@/components/upload-section";
 import FileGallery from "@/components/file-gallery";
 import OtherTeamFiles from "@/components/other-team-files";
 import AdminFilesManager from "@/components/admin-files-manager";
-import AdminModal from "@/components/admin-modal";
 import AdminSettingsModal from "@/components/admin-settings-modal";
+import UserMenu from "@/components/user-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,7 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 export default function Home() {
   const [currentView, setCurrentView] = useState<"upload" | "team-files" | "other-files" | "admin-files">("upload");
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [showAdminSettings, setShowAdminSettings] = useState(false);
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -128,39 +129,35 @@ export default function Home() {
               {/* Theme Toggle */}
               <ThemeToggle />
               
-              {/* User info and logout - moved to end */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                disabled={logoutMutation.isPending}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-              
-              {/* Admin Buttons */}
-              {user?.isAdmin && (
+              {/* User Controls */}
+              {user?.isAdmin ? (
                 <>
+                  {/* Admin: Show logout button and settings gear */}
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowAdminSettings(true)}
-                    className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent"
-                    title="Assignment Settings"
+                    onClick={handleLogout}
+                    disabled={logoutMutation.isPending}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
                   >
-                    <Settings className="text-lg" />
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
                   </Button>
+                  
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowAdminModal(true)}
                     className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent"
-                    title="File Management"
+                    title="Admin Settings"
                   >
-                    <Grid3X3 className="text-lg" />
+                    <Settings className="text-lg" />
                   </Button>
+                </>
+              ) : (
+                <>
+                  {/* Team Members: Show hamburger menu */}
+                  <UserMenu />
                 </>
               )}
             </div>
@@ -171,7 +168,7 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === "upload" && (
           <div className="animate-fade-in">
-            <UploadSection onUploadSuccess={() => setCurrentView("team-files")} />
+            <UploadSection onUploadSuccess={() => setCurrentView(user?.isAdmin ? "admin-files" : "team-files")} />
           </div>
         )}
         
@@ -194,15 +191,11 @@ export default function Home() {
         )}
       </main>
 
-      <AdminModal 
+      <AdminSettingsModal 
         open={showAdminModal}
         onOpenChange={setShowAdminModal}
       />
       
-      <AdminSettingsModal 
-        open={showAdminSettings}
-        onOpenChange={setShowAdminSettings}
-      />
     </div>
   );
 }

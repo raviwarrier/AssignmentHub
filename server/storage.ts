@@ -7,8 +7,13 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByTeam(teamNumber: number): Promise<User | undefined>;
+  getUserByTeamName(teamName: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLogin(teamNumber: number): Promise<void>;
+  updateUserPassword(teamNumber: number, passwordHash: string): Promise<void>;
+  checkTeamNameAvailable(teamName: string, excludeTeamNumber?: number): Promise<boolean>;
+  getAllUsers(): Promise<User[]>;
+  deleteUser(teamNumber: number): Promise<boolean>;
   
   // File operations
   createFile(file: InsertFile & { fileName: string }): Promise<File>;
@@ -90,6 +95,39 @@ export class MemStorage implements IStorage {
       user.lastLogin = new Date();
       this.users.set(user.id, user);
     }
+  }
+
+  async getUserByTeamName(teamName: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.teamName === teamName,
+    );
+  }
+
+  async updateUserPassword(teamNumber: number, passwordHash: string): Promise<void> {
+    const user = await this.getUserByTeam(teamNumber);
+    if (user) {
+      user.passwordHash = passwordHash;
+      this.users.set(user.id, user);
+    }
+  }
+
+  async checkTeamNameAvailable(teamName: string, excludeTeamNumber?: number): Promise<boolean> {
+    const existingUser = Array.from(this.users.values()).find(
+      (user) => user.teamName?.toLowerCase() === teamName.toLowerCase() && user.teamNumber !== excludeTeamNumber
+    );
+    return !existingUser;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values()).sort((a, b) => a.teamNumber - b.teamNumber);
+  }
+
+  async deleteUser(teamNumber: number): Promise<boolean> {
+    const user = await this.getUserByTeam(teamNumber);
+    if (user) {
+      return this.users.delete(user.id);
+    }
+    return false;
   }
 
   async createFile(fileData: InsertFile & { fileName: string }): Promise<File> {
@@ -239,6 +277,44 @@ class DBStorage implements IStorage {
     await this.db.update(users)
       .set({ lastLogin: new Date() })
       .where(eq(users.teamNumber, teamNumber));
+  }
+
+  async getUserByTeamName(teamName: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.teamName, teamName)).limit(1);
+    return result[0];
+  }
+
+  async updateUserPassword(teamNumber: number, passwordHash: string): Promise<void> {
+    await this.db.update(users)
+      .set({ passwordHash })
+      .where(eq(users.teamNumber, teamNumber));
+  }
+
+  async checkTeamNameAvailable(teamName: string, excludeTeamNumber?: number): Promise<boolean> {
+    let query = this.db.select().from(users).where(eq(users.teamName, teamName));
+    
+    if (excludeTeamNumber !== undefined) {
+      const { and, ne } = await import("drizzle-orm");
+      query = this.db.select().from(users).where(
+        and(
+          eq(users.teamName, teamName),
+          ne(users.teamNumber, excludeTeamNumber)
+        )
+      );
+    }
+    
+    const result = await query.limit(1);
+    return result.length === 0;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const { asc } = await import("drizzle-orm");
+    return await this.db.select().from(users).orderBy(asc(users.teamNumber));
+  }
+
+  async deleteUser(teamNumber: number): Promise<boolean> {
+    const result = await this.db.delete(users).where(eq(users.teamNumber, teamNumber)).returning();
+    return result.length > 0;
   }
 
   // File operations

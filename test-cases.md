@@ -16,18 +16,35 @@ This document outlines comprehensive test cases to verify all functionality work
 - [ ] Verify error message displays
 - [ ] Verify no access to admin features
 
-## Student Authentication Tests
+## Team Authentication Tests (NEW - Database + Passport.js)
 
-### S1. Student Login
-- [ ] Navigate to the application 
-- [ ] Enter team number (1-9) and corresponding password
-- [ ] Verify successful login with "Team X" label in header
-- [ ] Verify student-specific navigation tabs are visible
+### T1. Team Registration
+- [ ] Navigate to application, click "Register Team" 
+- [ ] **Test Team Number Validation**: Try invalid numbers (0, 10, letters)
+- [ ] **Test Required Fields**: Try submitting without team number/password
+- [ ] **Test Password Strength**: Try weak passwords (no uppercase, <12 chars, etc.)
+- [ ] **Register Valid Team**: Team number (1-9), optional team name, strong password
+- [ ] **Verify Success Message**: Should show "Team X has been registered" 
+- [ ] **Test Duplicate Registration**: Try registering same team number again (should fail)
 
-### S2. Invalid Student Login
-- [ ] Try logging in with invalid team/password combination
-- [ ] Verify error message displays
-- [ ] Verify no access to application features
+### T2. Team Login (Team Number + Password)
+- [ ] Navigate to application 
+- [ ] **Login with Team Number Only**: Enter team number (1-9) and password
+- [ ] **Verify Successful Login**: Should show "Team X" or "Team Name" in header
+- [ ] **Test Optional Team Names**: Teams with names should display name, teams without should show number
+- [ ] **Test Invalid Credentials**: Wrong team number or password (should fail)
+
+### T3. Environment Variable Fallback (Migration Support)
+- [ ] **Test Legacy Login**: If TEAM_X_PASSWORD environment variables exist, login should work
+- [ ] **Test Hybrid System**: Registered teams use database, unregistered teams use environment
+- [ ] **Verify Migration Path**: Environment teams can register to upgrade to database auth
+
+### T4. Password Management
+- [ ] **Login as Team**: Login with database-registered team
+- [ ] **Change Password**: Navigate to profile/settings, change password
+- [ ] **Test Password Validation**: Try weak new passwords (should fail)
+- [ ] **Test Current Password**: Wrong current password should fail
+- [ ] **Verify New Password Works**: Logout, login with new password
 
 ## Admin File Management Tests
 
@@ -123,12 +140,31 @@ This document outlines comprehensive test cases to verify all functionality work
 - [ ] **Admin**: Change file to "hidden"
 - [ ] **Student**: Refresh, verify file disappears from "Other Team Files"
 
-### I2. Assignment Open View Testing
-- [ ] **Admin**: Upload files to Assignment 1, mark as hidden
-- [ ] **Admin**: Set Assignment 1 as "Open View" 
-- [ ] **Student**: Upload files to Assignment 1
-- [ ] **Other Student**: Login as different team, check "Other Team Files"
-- [ ] **Verify**: Should see other student files (assignment is open) but NOT admin files (marked hidden)
+### I2. Admin File Visibility vs Assignment Settings (CRITICAL - Bug Fix)
+- [ ] **Setup**: Register Team 1 and Team 2
+- [ ] **Admin**: Upload file to Assignment 1, keep default visibility (visible)
+- [ ] **Admin**: Set Assignment 1 as "Open View"
+- [ ] **Team 1**: Should see admin file in "Other Team Files" (visible + assignment open)
+- [ ] **Team 2**: Should see admin file in "Other Team Files" (visible + assignment open)
+- [ ] **Admin**: Hide the admin file (toggle visibility off)
+- [ ] **Team 1**: Refresh - should NOT see admin file (hidden overrides assignment open)
+- [ ] **Team 2**: Refresh - should NOT see admin file (hidden overrides assignment open)
+- [ ] **Admin**: Show the admin file again (toggle visibility on)
+- [ ] **Team 1**: Should see admin file again (visible + assignment open)
+- [ ] **Team 2**: Should see admin file again (visible + assignment open)
+- [ ] **Admin**: Close Assignment 1 (turn off "Open View")
+- [ ] **Team 1**: Should still see admin file (admin visibility independent of assignment settings)
+- [ ] **Team 2**: Should still see admin file (admin visibility independent of assignment settings)
+
+### I3. Multi-Team Assignment File Sharing
+- [ ] **Team 1**: Upload files to Assignment 1
+- [ ] **Team 2**: Upload files to Assignment 1  
+- [ ] **Admin**: Keep Assignment 1 closed (not "Open View")
+- [ ] **Team 1**: Should only see own files in "Other Team Files"
+- [ ] **Team 2**: Should only see own files in "Other Team Files"
+- [ ] **Admin**: Open Assignment 1 ("Open View" = true)
+- [ ] **Team 1**: Should see Team 2's files in "Other Team Files"
+- [ ] **Team 2**: Should see Team 1's files in "Other Team Files"
 
 ### I3. File Editing Persistence Across Users
 - [ ] **Admin**: Upload file with basic info
@@ -146,10 +182,14 @@ This document outlines comprehensive test cases to verify all functionality work
 - [ ] Upload 10+ files at once
 - [ ] Test with files containing special characters in names
 
-### E2. Session Management
-- [ ] Login as admin, wait for session timeout, try to perform actions
-- [ ] Login as student, manually clear cookies, try to access files
-- [ ] Test concurrent logins with different users
+### E2. Authentication & Session Management (NEW - Passport.js)
+- [ ] **Session Persistence**: Login as team, close browser, reopen - should stay logged in
+- [ ] **Session Timeout**: Login, wait for session timeout, try actions (should redirect to login)
+- [ ] **Concurrent Logins**: Login as Team 1 in one browser, Team 2 in another (should work)
+- [ ] **Logout Functionality**: Test logout button, verify full session cleanup
+- [ ] **Manual Cookie Clearing**: Clear cookies manually, try to access protected routes
+- [ ] **Registration During Session**: Login as Team 1, try to register Team 2 (should work)
+- [ ] **Password Change Impact**: Change password, verify old sessions become invalid
 
 ### E3. Network Error Handling  
 - [ ] Disconnect internet during file upload
@@ -204,21 +244,33 @@ This document outlines comprehensive test cases to verify all functionality work
 
 **Required for Basic Functionality:**
 - [ ] Admin login and file management (A1, A3, A4, A5)
-- [ ] Student login and simplified view (S1, S4) 
+- [ ] **NEW**: Team registration and login (T1, T2) 
+- [ ] **NEW**: Admin file visibility independent of assignment settings (I2 - CRITICAL)
 - [ ] Admin file visibility to students (S5, I1)
 - [ ] File editing modal fixes (A4 - cancel, save, persistence)
 - [ ] "Warrier" labeling instead of "Team 0" (A7, S5)
 
 **Required for Full Feature Set:**
-- [ ] Assignment open view controls (A8, I2)
+- [ ] **NEW**: Environment variable fallback authentication (T3)
+- [ ] **NEW**: Password management system (T4)
+- [ ] **NEW**: Multi-team file sharing logic (I3)
+- [ ] Assignment open view controls (A8)
 - [ ] Cross-user integration (I1, I2, I3)
-- [ ] Error handling (E1, E2)
+- [ ] **NEW**: Passport.js session management (E2)
+- [ ] Error handling (E1, E3)
 - [ ] Navigation and UI (U1, U2, U3)
 
-**Production Ready:**
+**Production Ready (Database Required):**
 - [ ] All test cases above
+- [ ] **NEW**: Database authentication migration (T3, P2)
 - [ ] Performance tests (PR1, PR2)
 - [ ] Data persistence (P1, P2)
+
+## NEW CRITICAL TEST: Admin File Visibility Bug Fix
+
+**This test is ESSENTIAL** - the previous bug allowed admin files to be visible when they were marked as hidden, if their assignment was set to "Open View". 
+
+**Test Scenario I2** above specifically tests this fix. **MUST PASS** for production deployment.
 
 ---
 

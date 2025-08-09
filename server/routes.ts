@@ -1,12 +1,14 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertFileSchema } from "@shared/schema";
+import { insertFileSchema, registerUserSchema } from "@shared/schema";
+import { AuthService } from "./auth";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import session from "express-session";
 import MemoryStore from "memorystore";
+import passport from './passport-config';
 
 // Configure session store
 const MemoryStoreConstructor = MemoryStore(session);
@@ -69,10 +71,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
   }));
+
+  // Initialize Passport
+  app.use(passport.initialize());
+  app.use(passport.session());
   
   // Authentication helper
   function requireAuth(req: Request, res: Response, next: Function) {
-    if (req.session.user) {
+    if (req.isAuthenticated()) {
       next();
     } else {
       res.status(401).json({ message: "Authentication required" });
@@ -80,108 +86,406 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   
   function requireAdmin(req: Request, res: Response, next: Function) {
-    if (req.session.user && req.session.user.isAdmin) {
+    if (req.isAuthenticated() && req.user && (req.user as any).isAdmin) {
       next();
     } else {
       res.status(403).json({ message: "Admin access required" });
     }
   }
   
-  // Team login
-  app.post("/api/login", async (req, res) => {
+  // Team registration
+  app.post("/api/register", async (req, res) => {
     try {
-      const { teamNumber, password } = req.body;
-      
-      if (!teamNumber || !password) {
-        return res.status(400).json({ message: "Team number and password required" });
-      }
-      
-      // Get team password from environment
-      const teamPasswordKey = `TEAM_${teamNumber}_PASSWORD`;
-      const expectedPassword = process.env[teamPasswordKey];
-      
-      if (!expectedPassword) {
-        return res.status(401).json({ message: "Invalid team number" });
-      }
-      
-      if (password !== expectedPassword) {
-        return res.status(401).json({ message: "Invalid password" });
-      }
-      
-      // Check if user exists, create if not
-      let user = await storage.getUserByTeam(parseInt(teamNumber));
-      if (!user) {
-        user = await storage.createUser({
-          teamNumber: parseInt(teamNumber),
-          isAdmin: "false"
+      const result = registerUserSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid registration data", 
+          errors: result.error.issues.map(issue => issue.message)
         });
       }
-      
-      // Update login time
-      await storage.updateUserLogin(parseInt(teamNumber));
-      
-      // Set session
-      req.session.user = {
-        teamNumber: parseInt(teamNumber),
-        isAdmin: user.isAdmin === "true"
-      };
-      
-      res.json({ 
-        message: "Login successful", 
-        user: { 
-          teamNumber: user.teamNumber, 
-          isAdmin: user.isAdmin === "true" 
-        } 
+
+      const { teamNumber, teamName, password } = result.data;
+
+      // Check if team number is already taken
+      const existingUser = await storage.getUserByTeam(teamNumber);
+      if (existingUser && existingUser.passwordHash) {
+        return res.status(409).json({ message: "Team number already registered" });
+      }
+
+      // Check if team name is available (only if team name is provided)
+      if (teamName && teamName.trim()) {
+        const isTeamNameAvailable = await storage.checkTeamNameAvailable(teamName);
+        if (!isTeamNameAvailable) {
+          return res.status(409).json({ message: "Team name already taken" });
+        }
+      }
+
+      // Validate password strength
+      const passwordValidation = AuthService.validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ 
+          message: "Password does not meet requirements", 
+          errors: passwordValidation.errors 
+        });
+      }
+
+      // Validate team name (only if provided)
+      if (teamName && teamName.trim()) {
+        const teamNameValidation = AuthService.validateTeamName(teamName);
+        if (!teamNameValidation.isValid) {
+          return res.status(400).json({ 
+            message: "Invalid team name", 
+            errors: teamNameValidation.errors 
+          });
+        }
+      }
+
+      // Hash password
+      const passwordHash = await AuthService.hashPassword(password);
+
+      // Create or update user
+      let user;
+      if (existingUser) {
+        // Update existing user with new registration data
+        await storage.updateUserPassword(teamNumber, passwordHash);
+        user = await storage.getUserByTeam(teamNumber);
+      } else {
+        // Create new user
+        user = await storage.createUser({
+          teamNumber,
+          teamName: teamName?.trim() || null,
+          passwordHash,
+          isAdmin: "false",
+          isActive: "true"
+        });
+      }
+
+      res.status(201).json({ 
+        message: "Team registered successfully",
+        team: {
+          teamNumber: user?.teamNumber,
+          teamName: user?.teamName
+        }
       });
     } catch (error) {
-      res.status(500).json({ message: "Login failed" });
+      console.error('Registration error:', error);
+      res.status(500).json({ message: "Registration failed" });
     }
   });
-  
-  // Admin login (separate endpoint for instructor access)
-  app.post("/api/admin-login", async (req, res) => {
-    try {
-      const { password } = req.body;
-      
-      if (!password) {
-        return res.status(400).json({ message: "Password required" });
+
+  // Team login using Passport.js
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate('team-login', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Login error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
       
-      const expectedPassword = process.env.ADMIN_PASSWORD;
-      if (!expectedPassword || password !== expectedPassword) {
-        return res.status(401).json({ message: "Invalid admin password" });
-      }
-      
-      // Set admin session
-      req.session.user = {
-        teamNumber: 0, // Admin has special team number 0
-        isAdmin: true
-      };
-      
-      res.json({ 
-        message: "Admin login successful", 
-        user: { 
-          teamNumber: 0, 
-          isAdmin: true 
-        } 
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login error" });
+        }
+        return res.json({ 
+          message: "Login successful", 
+          user: user
+        });
       });
-    } catch (error) {
-      res.status(500).json({ message: "Admin login failed" });
-    }
+    })(req, res, next);
+  });
+  
+  // Admin login using Passport.js
+  app.post("/api/admin-login", (req, res, next) => {
+    passport.authenticate('admin-login', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Admin login error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid admin password" });
+      }
+      
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login error" });
+        }
+        return res.json({ 
+          message: "Admin login successful", 
+          user: user
+        });
+      });
+    })(req, res, next);
   });
   
   // Get current user
   app.get("/api/user", (req, res) => {
-    if (req.session.user) {
-      res.json(req.session.user);
+    if (req.isAuthenticated() && req.user) {
+      res.json(req.user);
     } else {
       res.status(401).json({ message: "Not authenticated" });
+    }
+  });
+
+
+  // Get all teams (admin only)
+  app.get("/api/admin/teams", requireAdmin, async (req, res) => {
+    console.log('DEBUG: Teams endpoint called');
+    try {
+      console.log('DEBUG: About to call storage.getAllUsers()');
+      const users = await storage.getAllUsers();
+      console.log('DEBUG: Raw users from storage:', users);
+      console.log('DEBUG: Users is array?', Array.isArray(users));
+      
+      if (!Array.isArray(users)) {
+        console.error('DEBUG: Users is not an array!');
+        return res.json([]);
+      }
+      
+      const teams = users
+        .filter(user => user.teamNumber !== 0) // Exclude admin
+        .map(user => ({
+          teamNumber: user.teamNumber,
+          teamName: user.teamName || `Team ${user.teamNumber}`,
+          hasPassword: !!user.passwordHash,
+          lastLogin: user.lastLogin,
+          createdAt: user.createdAt,
+          isActive: user.isActive === "true"
+        }));
+      console.log('DEBUG: Processed teams:', teams);
+      res.json(teams);
+    } catch (error) {
+      console.error('DEBUG: Teams endpoint error:', error);
+      res.status(500).json({ message: "Failed to retrieve teams", error: error.message });
+    }
+  });
+
+  // Delete all files for a specific team (admin only)
+  app.delete("/api/admin/teams/:teamNumber/files", requireAdmin, async (req, res) => {
+    try {
+      const { adminPassword } = req.body;
+      const teamNumber = parseInt(req.params.teamNumber);
+      const expectedPassword = process.env.ADMIN_PASSWORD || process.env.ADMIN_DELETE_PASSWORD;
+      
+      if (!expectedPassword) {
+        return res.status(500).json({ message: "Admin password not configured" });
+      }
+
+      if (adminPassword !== expectedPassword) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+
+      if (isNaN(teamNumber)) {
+        return res.status(400).json({ message: "Invalid team number" });
+      }
+
+      // Get all files for the team
+      const teamFiles = await storage.getFilesByTeam(teamNumber);
+      
+      // Delete files from disk and database
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      let deletedCount = 0;
+      
+      for (const file of teamFiles) {
+        const filePath = path.join(uploadDir, file.fileName);
+        try {
+          await fs.unlink(filePath);
+        } catch (error) {
+          console.error(`Failed to delete file from disk: ${file.fileName}`, error);
+        }
+        
+        const deleted = await storage.deleteFile(file.id);
+        if (deleted) deletedCount++;
+      }
+
+      res.json({ 
+        message: `Deleted ${deletedCount} files for Team ${teamNumber}`,
+        deletedCount
+      });
+    } catch (error) {
+      console.error('Delete team files error:', error);
+      res.status(500).json({ message: "Failed to delete team files" });
+    }
+  });
+
+  // Delete team (admin only)
+  app.delete("/api/admin/teams/:teamNumber", requireAdmin, async (req, res) => {
+    try {
+      const { adminPassword } = req.body;
+      const teamNumber = parseInt(req.params.teamNumber);
+      const expectedPassword = process.env.ADMIN_PASSWORD || process.env.ADMIN_DELETE_PASSWORD;
+      
+      if (!expectedPassword) {
+        return res.status(500).json({ message: "Admin password not configured" });
+      }
+
+      if (adminPassword !== expectedPassword) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+
+      if (isNaN(teamNumber) || teamNumber === 0) {
+        return res.status(400).json({ message: "Invalid team number" });
+      }
+
+      // First delete all team files
+      const teamFiles = await storage.getFilesByTeam(teamNumber);
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      
+      for (const file of teamFiles) {
+        const filePath = path.join(uploadDir, file.fileName);
+        try {
+          await fs.unlink(filePath);
+        } catch (error) {
+          console.error(`Failed to delete file from disk: ${file.fileName}`, error);
+        }
+        await storage.deleteFile(file.id);
+      }
+
+      // Delete team user (if exists in database)
+      await storage.deleteUser(teamNumber);
+
+      res.json({ 
+        message: `Team ${teamNumber} deleted successfully`,
+        filesDeleted: teamFiles.length
+      });
+    } catch (error) {
+      console.error('Delete team error:', error);
+      res.status(500).json({ message: "Failed to delete team" });
+    }
+  });
+
+  // Reset server for new semester (admin only)
+  app.post("/api/admin/reset-server", requireAdmin, async (req, res) => {
+    try {
+      const { adminPassword, confirmText } = req.body;
+      const expectedPassword = process.env.ADMIN_PASSWORD || process.env.ADMIN_DELETE_PASSWORD;
+      
+      if (!expectedPassword) {
+        return res.status(500).json({ message: "Admin password not configured" });
+      }
+
+      if (adminPassword !== expectedPassword) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+
+      if (confirmText !== "RESET ALL DATA") {
+        return res.status(400).json({ message: "Confirmation text incorrect" });
+      }
+
+      // Get all files
+      const allFiles = await storage.getAllFiles();
+      
+      // Delete all files from disk
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      let filesDeleted = 0;
+      
+      for (const file of allFiles) {
+        const filePath = path.join(uploadDir, file.fileName);
+        try {
+          await fs.unlink(filePath);
+          filesDeleted++;
+        } catch (error) {
+          console.error(`Failed to delete file from disk: ${file.fileName}`, error);
+        }
+        await storage.deleteFile(file.id);
+      }
+
+      // Reset assignment settings to default (all closed)
+      const assignments = [
+        "Assignment 1 - Segmentation and Personas",
+        "Assignment 2 - Positioning", 
+        "Assignment 3 - Journey Mapping",
+        "Assignment 4 - Marketing Channels",
+        "Assignment 5 - Pricing",
+        "Assignment 6 - Distribution Channels",
+        "Assignment 7 - Acquisition",
+        "Assignment 8 - Customer Discovery",
+        "Assignment 9 - Product Validation"
+      ];
+      
+      for (const assignment of assignments) {
+        await storage.updateAssignmentSetting(assignment, false);
+      }
+
+      // Delete all users (except admin)
+      const allUsers = await storage.getAllUsers();
+      let usersDeleted = 0;
+      for (const user of allUsers) {
+        if (user.teamNumber !== 0) { // Don't delete admin
+          const deleted = await storage.deleteUser(user.teamNumber);
+          if (deleted) usersDeleted++;
+        }
+      }
+
+      res.json({ 
+        message: "Server reset successful - all files and data cleared",
+        filesDeleted,
+        usersDeleted,
+        assignmentsReset: assignments.length
+      });
+    } catch (error) {
+      console.error('Server reset error:', error);
+      res.status(500).json({ message: "Failed to reset server" });
+    }
+  });
+
+  // Change password
+  app.put("/api/user/password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const user = req.user as any;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new password required" });
+      }
+
+      // Get user from database
+      const dbUser = await storage.getUserByTeam(user.teamNumber);
+      if (!dbUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password (support both database and environment auth)
+      let currentPasswordValid = false;
+      if (dbUser.passwordHash) {
+        // Database authentication
+        currentPasswordValid = await AuthService.verifyPassword(currentPassword, dbUser.passwordHash);
+      } else {
+        // Environment authentication fallback
+        const teamPasswordKey = `TEAM_${user.teamNumber}_PASSWORD`;
+        const expectedPassword = process.env[teamPasswordKey];
+        currentPasswordValid = currentPassword === expectedPassword;
+      }
+
+      if (!currentPasswordValid) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      // Validate new password strength
+      const passwordValidation = AuthService.validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ 
+          message: "New password does not meet requirements", 
+          errors: passwordValidation.errors 
+        });
+      }
+
+      // Hash and update password
+      const newPasswordHash = await AuthService.hashPassword(newPassword);
+      await storage.updateUserPassword(user.teamNumber, newPasswordHash);
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error('Password change error:', error);
+      res.status(500).json({ message: "Failed to update password" });
     }
   });
   
   // Logout
   app.post("/api/logout", (req, res) => {
-    req.session.destroy(() => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
       res.json({ message: "Logout successful" });
     });
   });
@@ -189,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Assignment settings routes
   app.get("/api/assignment-settings", requireAuth, async (req, res) => {
     try {
-      const user = req.session.user!;
+      const user = req.user as any;
       const settings = await storage.getAssignmentSettings();
       
       if (user.isAdmin) {
@@ -226,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/files", requireAuth, async (req, res) => {
     try {
       const { team, type, assignment, search } = req.query;
-      const user = req.session.user!;
+      const user = req.user as any;
       
       let files;
       if (search) {
@@ -248,12 +552,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const openAssignments = assignmentSettings
           .filter(setting => setting.isOpenView === "true")
           .map(setting => setting.assignment);
+        
+        files = files.filter(file => {
+          const isOwnFile = file.teamNumber === user.teamNumber;
           
-        files = files.filter(file => 
-          file.teamNumber === user.teamNumber || // Own team's files
-          openAssignments.includes(file.assignment) || // Open view assignments
-          (file.teamNumber === 0 && file.isVisible === "true") // Visible admin files
-        );
+          // For admin files (team 0): ONLY check individual visibility, ignore assignment settings
+          if (file.teamNumber === 0) {
+            const shouldShow = file.isVisible === "true";
+            console.log(`DEBUG: Admin file ${file.id} visibility=${file.isVisible} -> ${shouldShow ? 'SHOW' : 'HIDE'}`);
+            return shouldShow;
+          }
+          
+          // For other team files: check if assignment is open
+          const isOtherTeamInOpenAssignment = openAssignments.includes(file.assignment);
+          const shouldShow = isOwnFile || isOtherTeamInOpenAssignment;
+          console.log(`DEBUG: Team ${file.teamNumber} file ${file.id} -> ${shouldShow ? 'SHOW' : 'HIDE'}`);
+          return shouldShow;
+        });
+        
+        console.log(`DEBUG: Final files for team ${user.teamNumber}:`, files.map(f => ({ id: f.id, team: f.teamNumber, visible: f.isVisible })));
       }
       
       res.json(files);
@@ -270,7 +587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { label, assignment, tags, description, isVisible } = req.body;
-      const user = req.session.user!;
+      const user = req.user as any;
       
       // Admin users get assigned to Team 0, others use their actual team number
       const teamNumber = user.isAdmin ? 0 : user.teamNumber;
@@ -324,7 +641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "File not found" });
       }
       
-      const user = req.session.user!;
+      const user = req.user as any;
       
       // Check permission to download file
       if (!user.isAdmin) {
@@ -386,7 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update file visibility (admin only)
   app.put("/api/files/:id/visibility", requireAuth, async (req, res) => {
     try {
-      const user = req.session.user!;
+      const user = req.user as any;
       if (!user.isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -418,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update file details (admin only for their files)
   app.put("/api/files/:id", requireAuth, async (req, res) => {
     try {
-      const user = req.session.user!;
+      const user = req.user as any;
       const { label, description, tags } = req.body;
       const file = await storage.getFileById(req.params.id);
       

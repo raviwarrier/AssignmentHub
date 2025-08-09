@@ -15,8 +15,10 @@ One of the biggest time-wasters in classroom presentations is the technical setu
 ## ✨ Key Features
 
 ### For Students
+- **Self-Registration**: Teams can register themselves with team number and chosen password
 - **Simple File Upload**: Upload presentation files (PDF, PPTX, DOCX, images) with assignment categorization
 - **Team-Based Organization**: Each team has secure login credentials
+- **Password Management**: Change passwords anytime through user menu
 - **Assignment Grouping**: Files automatically organized by assignment for easy navigation
 - **File Preview**: Preview files before presentations without downloading
 - **Cross-Team Viewing**: View files from other teams when assignments are marked as "open view"
@@ -25,29 +27,36 @@ One of the biggest time-wasters in classroom presentations is the technical setu
 - **Instant Access**: View all student files organized by team and assignment
 - **Live Presentation Mode**: Quick access to any student's files during class presentations
 - **Visibility Control**: Toggle assignment visibility for peer reviews and collaborative sessions
+- **Team Management**: View registered teams, delete team files or entire teams
 - **File Management**: Upload instructor files, edit descriptions, and manage content
+- **System Administration**: Reset server for new semester, view system information
 - **Bulk Operations**: Delete multiple files, manage assignments efficiently
 
 ### Technical Features
 - **No Installation Required**: Pure web-based solution accessible from any browser
 - **Responsive Design**: Works on laptops, tablets, and mobile devices
-- **Secure Authentication**: Team-based login system with admin controls
+- **Secure Authentication**: Team registration system with password hashing and admin controls
+- **User Management**: Teams can register, login, and change passwords independently
 - **File Type Support**: PDF, PPTX, DOCX, PNG, JPG, XLSX files up to 50MB
-- **Database Persistence**: PostgreSQL backend ensures files persist across server restarts
+- **Database Persistence**: PostgreSQL backend with fallback to memory storage for development
 - **Real-time Updates**: Changes reflect immediately across all users
 
 ## 🚀 Quick Start Guide
 
 ### For Students
 
-1. **Get Your Credentials**: Ask Warrier for your team login credentials or password reset
-2. **Login**: Use your team number and password to access the system
-3. **Upload Files**: 
+1. **Register Your Team**: 
+   - Visit the application URL
+   - Click "Register Team" if you haven't registered yet
+   - Choose your team number (1-9) and create a secure password
+   - Login with your credentials
+2. **Upload Files**: 
    - Click "Upload" tab
    - Select your assignment from the dropdown
    - Drag & drop or browse for files
    - Add labels and descriptions for easy identification
-4. **Manage Files**: Use "Your Files" tab to view and organize your uploads
+3. **Manage Files**: Use "Your Files" tab to view and organize your uploads
+4. **Account Management**: Click the hamburger menu (☰) to change password or logout
 5. **View Others**: Check "Other Team Files" to see presentations from other teams (when allowed)
 
 ### For Instructors
@@ -67,12 +76,11 @@ One of the biggest time-wasters in classroom presentations is the technical setu
 
 ### Environment Setup
 1. Copy `AssignmentHub.env.example` to `AssignmentHub.env`
-2. Configure your database connection and passwords:
+2. Configure your database connection and admin password:
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/assignmenthub
 ADMIN_PASSWORD=your-secure-admin-password
-TEAM_1_PASSWORD=team1-password
-# ... additional team passwords
+# Team passwords are no longer needed - teams register themselves
 ```
 
 ### Deployment Commands
@@ -104,8 +112,11 @@ pm2 stop assignmenthub        # Stop application
 
 ## 🔐 Security Features
 
-- **Team-Based Authentication**: Secure login system for each team
+- **Team Registration System**: Teams register themselves with chosen passwords
+- **Password Security**: All passwords hashed using bcrypt with high salt rounds
+- **Migration Support**: Legacy environment variable passwords supported during transition
 - **Admin Controls**: Separate admin access for instructor functions
+- **User Management**: Teams can change passwords independently
 - **File Visibility**: Granular control over which files students can view
 - **Session Management**: Automatic logout and secure session handling
 - **Input Validation**: File type restrictions and size limits
@@ -129,13 +140,17 @@ pm2 stop assignmenthub        # Stop application
 
 ## 📞 Support
 
-For technical issues, password resets, or questions about the system:
+For technical issues or questions about the system:
 
 **Contact Warrier** for:
-- Team password requests
-- Password resets  
 - Technical support
 - Feature requests
+- System administration
+
+**Self-Service Features**:
+- Team registration (no setup required)
+- Password changes through user menu
+- File management and uploads
 
 ---
 
@@ -143,6 +158,14 @@ For technical issues, password resets, or questions about the system:
 
 This application was developed with assistance from [Claude Code](https://claude.ai/code).
 
-**Version**: 1.0  
+**Version**: 2.0  
 **Last Updated**: August 2025  
 **License**: MIT
+
+### Recent Updates (v2.0)
+- Added team self-registration system
+- Implemented user password management
+- Enhanced admin settings with left/right panel layout
+- Added hamburger menu for team members
+- Improved authentication with bcrypt password hashing
+- Enhanced team management capabilities for administrators
