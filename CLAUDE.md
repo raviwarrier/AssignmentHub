@@ -66,12 +66,12 @@ shared/             - Shared TypeScript definitions
 
 ### Authentication System
 - **Session-based authentication** using express-session with memory store
-- **Team-based access:** Students log in with team numbers and passwords
+- **Team-based access:** Students register and log in with team numbers and custom team names/passwords
 - **Admin access:** Separate admin login with elevated permissions
 - **Environment variables:** 
-  - `TEAM_X_PASSWORD` for team X login credentials
   - `ADMIN_PASSWORD` for admin access
   - `SESSION_SECRET` for session signing
+  - `DATABASE_URL` for PostgreSQL connection
 
 ### File Management System
 - **Upload restrictions:** 50MB file size limit, specific file types (JPG, PNG, PDF, DOCX, PPTX)
@@ -97,11 +97,8 @@ shared/             - Shared TypeScript definitions
 Required environment variables:
 ```bash
 DATABASE_URL=          # PostgreSQL connection string
-SESSION_SECRET=        # Secret for session signing
+SESSION_SECRET=        # Secret for session signing (optional - will generate if not provided)
 ADMIN_PASSWORD=        # Admin login password
-TEAM_1_PASSWORD=       # Team 1 login password
-TEAM_2_PASSWORD=       # Team 2 login password
-# ... additional team passwords as needed
 ```
 
 ## Database Schema

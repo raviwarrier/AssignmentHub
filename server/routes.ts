@@ -256,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasPassword: !!user.passwordHash,
           lastLogin: user.lastLogin,
           createdAt: user.createdAt,
-          isActive: user.isActive === "true"
+          isActive: user.isActive === true || user.isActive === "true"
         }));
       console.log('DEBUG: Processed teams:', teams);
       res.json(teams);
