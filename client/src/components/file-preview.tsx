@@ -388,7 +388,7 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
           {/* Main Preview Area */}
           <div className="flex-1 flex flex-col">
             {/* Simplified Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-background">
+            <div className="flex items-center justify-between p-4 pr-16 border-b bg-background">
               <div>
                 <DialogTitle className="text-lg font-semibold text-foreground">
                   {file.label}
@@ -397,7 +397,7 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
                   {file.originalName} • {getFileTypeDisplay(file.fileType)} • {formatFileSize(file.fileSize)}
                 </p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 mr-8">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -460,68 +460,65 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
           </div>
 
           {/* Right Details Panel */}
-          <div className={`border-l bg-muted/30 transition-all duration-300 ${
-            isPanelCollapsed ? 'w-8' : 'w-80'
+          <div className={`bg-muted/30 transition-all duration-300 relative ${
+            isPanelCollapsed ? 'w-0' : 'w-80 border-l'
           }`}>
-            {/* Toggle Button */}
-            <div className="h-full flex flex-col">
-              <div className="p-2 border-b">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-                  className="w-full justify-center"
-                >
-                  {isPanelCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                </Button>
-              </div>
-              
-              {/* Panel Content */}
-              {!isPanelCollapsed && (
-                <div className="p-4 space-y-4 overflow-y-auto">
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Team:</span>
-                      <span className="text-foreground font-medium">Team {file.teamNumber}</span>
-                    </div>
-                    
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Assignment:</span>
-                      <span className="text-foreground text-xs leading-relaxed">{file.assignment}</span>
-                    </div>
-                    
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Tags:</span>
-                      {file.tags.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {file.tags.map((tag, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground italic">N/A</span>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Description:</span>
-                      {file.description ? (
-                        <p className="text-foreground text-xs leading-relaxed">{file.description}</p>
-                      ) : (
-                        <span className="text-muted-foreground italic">N/A</span>
-                      )}
-                    </div>
-                    
-                    <div className="pt-2 border-t">
-                      <span className="text-muted-foreground block mb-1">Uploaded:</span>
-                      <span className="text-foreground text-xs">{formatDate(file.uploadedAt)}</span>
-                    </div>
+            {/* Toggle Button - positioned on the left edge */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+              className="absolute -left-8 top-1/2 -translate-y-1/2 h-16 w-8 rounded-l-md rounded-r-none border border-r-0 bg-background hover:bg-accent flex items-center justify-center shadow-sm z-10"
+              title={isPanelCollapsed ? "Expand details panel" : "Collapse details panel"}
+            >
+              {isPanelCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </Button>
+            
+            {/* Panel Content */}
+            {!isPanelCollapsed && (
+              <div className="p-4 space-y-4 overflow-y-auto h-full">
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Team:</span>
+                    <span className="text-foreground font-medium">Team {file.teamNumber}</span>
+                  </div>
+                  
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Assignment:</span>
+                    <span className="text-foreground text-xs leading-relaxed">{file.assignment}</span>
+                  </div>
+                  
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Tags:</span>
+                    {file.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {file.tags.map((tag, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic">N/A</span>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Description:</span>
+                    {file.description ? (
+                      <p className="text-foreground text-xs leading-relaxed">{file.description}</p>
+                    ) : (
+                      <span className="text-muted-foreground italic">N/A</span>
+                    )}
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <span className="text-muted-foreground block mb-1">Uploaded:</span>
+                    <span className="text-foreground text-xs">{formatDate(file.uploadedAt)}</span>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
