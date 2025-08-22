@@ -24,6 +24,8 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
   const [adminPassword, setAdminPassword] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -84,12 +86,77 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
     setAdminPassword("");
     setShowDeleteDialog(false);
     setIsPanelCollapsed(true);
+    setImageDimensions({ width: 0, height: 0 });
+    setContainerDimensions({ width: 0, height: 0 });
   }, [file?.id]);
 
-  // Add keyboard support for panning
+  // Track container and image dimensions for panning logic
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        setContainerDimensions({ 
+          width: containerRect.width, 
+          height: containerRect.height 
+        });
+      }
+    };
+
+    const handleImageLoad = () => {
+      if (imageRef.current) {
+        const img = imageRef.current;
+        setImageDimensions({ 
+          width: img.naturalWidth, 
+          height: img.naturalHeight 
+        });
+      }
+    };
+
+    if (imageRef.current) {
+      imageRef.current.addEventListener('load', handleImageLoad);
+    }
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+
+    return () => {
+      if (imageRef.current) {
+        imageRef.current.removeEventListener('load', handleImageLoad);
+      }
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, [file?.id]);
+
+  // Check if panning should be enabled based on content size vs container size
+  const shouldEnablePanning = () => {
+    return imageScale >= 1;
+  };
+
+  // Add keyboard support for panning and zooming
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (imageScale > 1) {
+      // Handle zoom with Ctrl+Plus/Minus
+      if (e.ctrlKey) {
+        switch (e.key) {
+          case '+':
+          case '=':
+            handleZoomIn();
+            e.preventDefault();
+            break;
+          case '-':
+            handleZoomOut();
+            e.preventDefault();
+            break;
+          case '0':
+            handleResetView();
+            e.preventDefault();
+            break;
+        }
+        return;
+      }
+
+      // Handle panning with arrow keys
+      if (shouldEnablePanning()) {
         const step = 50;
         switch (e.key) {
           case 'ArrowLeft':
@@ -114,7 +181,7 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [imageScale]);
+  }, [imageScale, imageDimensions, containerDimensions]);
 
   const handleZoomIn = () => {
     setImageScale(prev => Math.min(prev * 1.5, 5));
@@ -130,7 +197,7 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (imageScale > 1) {
+    if (shouldEnablePanning()) {
       setIsDragging(true);
       setDragStart({ x: e.clientX - imagePosition.x, y: e.clientY - imagePosition.y });
       e.preventDefault();
@@ -138,7 +205,7 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging && imageScale > 1) {
+    if (isDragging && shouldEnablePanning()) {
       setImagePosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -151,12 +218,16 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      handleZoomIn();
-    } else {
-      handleZoomOut();
+    // Only zoom when Ctrl key is held down
+    if (e.ctrlKey) {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        handleZoomIn();
+      } else {
+        handleZoomOut();
+      }
     }
+    // Otherwise, let the browser handle normal scrolling
   };
 
   const handleDelete = () => {
@@ -245,32 +316,33 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
             </div>
             <div className="text-sm text-muted-foreground flex items-center space-x-2">
               <Move className="w-4 h-4" />
-              <span>{Math.round(imageScale * 100)}% • Scroll to zoom, drag to pan</span>
+              <span>{Math.round(imageScale * 100)}% • Ctrl+scroll or Ctrl+±/0 to zoom{shouldEnablePanning() ? ', drag to pan, arrows to move' : ''}</span>
             </div>
           </div>
 
           {/* Image Container */}
           <div 
             ref={containerRef}
-            className="flex-1 flex items-center justify-center overflow-hidden relative"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            className="flex-1 overflow-auto relative"
             onWheel={handleWheel}
-            style={{ cursor: imageScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
             tabIndex={0}
           >
             <img 
               ref={imageRef}
               src={downloadUrl}
               alt={file.originalName}
-              className="rounded shadow-lg transition-transform select-none"
+              className="rounded shadow-lg transition-transform select-none block m-auto"
               style={{
                 transform: `scale(${imageScale}) translate(${imagePosition.x / imageScale}px, ${imagePosition.y / imageScale}px)`,
-                maxWidth: imageScale > 1 ? 'none' : '100%',
-                maxHeight: imageScale > 1 ? 'none' : '100%'
+                transformOrigin: 'center',
+                minWidth: imageScale > 1 ? '100%' : 'auto',
+                minHeight: imageScale > 1 ? '100%' : 'auto',
+                cursor: shouldEnablePanning() ? (isDragging ? 'grabbing' : 'grab') : 'default'
               }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
               onError={(e) => {
                 // Fallback to generic preview if image fails to load
                 e.currentTarget.style.display = 'none';
@@ -278,10 +350,12 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
               }}
               draggable={false}
             />
-            <div className="text-center hidden">
-              <div className="text-6xl mb-4">🖼️</div>
-              <p className="text-foreground">Image Preview</p>
-              <p className="text-sm text-muted-foreground mt-2">Click download to view full image</p>
+            <div className="text-center hidden absolute inset-0 flex items-center justify-center">
+              <div>
+                <div className="text-6xl mb-4">🖼️</div>
+                <p className="text-foreground">Image Preview</p>
+                <p className="text-sm text-muted-foreground mt-2">Click download to view full image</p>
+              </div>
             </div>
 
           </div>

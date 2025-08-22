@@ -8,9 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev
 ```
-- Starts the Express API server and Vite frontend dev server concurrently
+- Starts development server using tsx to run `server/index.ts`
 - API runs on the port specified by `PORT` environment variable (defaults to 5000)
-- Frontend served via Vite dev server with HMR
+- Vite dev server integrated for frontend with HMR
+- Uses custom environment file: `AssignmentHub.env`
 
 **Build for production:**
 ```bash
@@ -65,19 +66,24 @@ shared/             - Shared TypeScript definitions
 ```
 
 ### Authentication System
-- **Session-based authentication** using express-session with memory store
-- **Team-based access:** Students register and log in with team numbers and custom team names/passwords
-- **Admin access:** Separate admin login with elevated permissions
+- **Session-based authentication** using express-session with MemoryStore
+- **Passport.js integration** for authentication middleware
+- **Team registration system:** Teams self-register with team numbers (1-9) and custom passwords
+- **Password security:** bcrypt hashing with 12 salt rounds, strong validation requirements
+- **Admin access:** Separate admin login via environment `ADMIN_PASSWORD`
+- **Session management:** 24-hour cookie expiry, HTTP-only cookies
 - **Environment variables:** 
   - `ADMIN_PASSWORD` for admin access
-  - `SESSION_SECRET` for session signing
+  - `SESSION_SECRET` for session signing (optional - auto-generated if not provided)
   - `DATABASE_URL` for PostgreSQL connection
 
 ### File Management System
 - **Upload restrictions:** 50MB file size limit, specific file types (JPG, PNG, PDF, DOCX, PPTX)
+- **Multer configuration:** Custom disk storage with timestamp-based unique filenames
 - **Permission system:** Students can only see their own files and files from "open view" assignments
-- **Storage location:** Files stored in `uploads/` directory with UUID-based naming
+- **Storage location:** Files stored in `uploads/` directory with auto-generated unique names
 - **Database tracking:** File metadata stored in PostgreSQL with filesystem references
+- **File operations:** Upload, delete, visibility toggle, metadata editing via API endpoints
 
 ### Assignment Permission Model
 - **Assignment settings** control visibility of files across teams
@@ -115,12 +121,14 @@ ADMIN_PASSWORD=        # Admin login password
 
 ## Development Notes
 
-- **File uploads** handled via multer with temporary storage before database insertion
+- **File uploads** handled via multer with disk storage and database metadata insertion
 - **API prefix:** All backend routes use `/api` prefix for clear separation
-- **Type safety:** Shared types between frontend/backend via `@shared` alias
-- **Error handling:** Centralized middleware with structured error responses
-- **Request logging:** Custom middleware logs API calls with response times
+- **Type safety:** Shared types between frontend/backend via `@shared` alias in `vite.config.ts`
+- **Error handling:** Centralized middleware with structured error responses and status codes
+- **Request logging:** Custom middleware logs API calls with response times and JSON responses
+- **Storage abstraction:** Interface-based storage with PostgreSQL/memory fallback
 - **Development tools:** Replit-specific plugins for enhanced development experience
+- **Authentication middleware:** `requireAuth` and `requireAdmin` helper functions for route protection
 
 ## Testing & Production
 
@@ -132,15 +140,22 @@ ADMIN_PASSWORD=        # Admin login password
 ## Common Tasks
 
 **Adding new assignment:**
-1. Update the assignments array in `server/storage.ts` MemStorage constructor
-2. The assignment will be automatically available in admin settings
+1. Update the assignments array in `server/storage.ts` MemStorage constructor (lines 49-59)
+2. Update the corresponding array in DBStorage class (lines 454-464)
+3. The assignment will be automatically available in admin settings
 
 **File permission debugging:**
 - Check assignment settings via admin panel
 - Verify team ownership in database
-- Review permission filtering logic in `server/routes.ts:214-245`
+- Review permission filtering logic in `server/routes.ts` (check file access control)
+- Assignment visibility controlled by `assignment_settings` table
 
 **Database connection issues:**
-- Verify `DATABASE_URL` environment variable
+- Verify `DATABASE_URL` environment variable in `AssignmentHub.env`
 - Check network connectivity to PostgreSQL instance
-- Use in-memory storage fallback during development if needed
+- Application automatically falls back to in-memory storage if database connection fails
+- Storage abstraction in `server/storage.ts` handles the fallback gracefully
+
+**Environment file:**
+- Uses `AssignmentHub.env` (not `.env`) loaded via dotenv config path
+- Copy from `AssignmentHub.env.example` to get started

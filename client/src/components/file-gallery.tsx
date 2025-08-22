@@ -335,7 +335,7 @@ export default function FileGallery({ onUploadClick }: FileGalleryProps) {
       id: assignment,
       title: assignment.split(' - ')[0],
       subtitle: assignment.split(' - ')[1] || '',
-      files: files.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()),
+      files: files.sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()),
       icon: <BookOpen className="text-2xl text-primary" />
     }));
   };
@@ -518,7 +518,7 @@ export default function FileGallery({ onUploadClick }: FileGalleryProps) {
                   {/* Files Grid */}
                   {box.files.length > 0 ? (
                     <div className="grid grid-cols-2 gap-2 mt-4">
-                      {box.files.slice(0, 4).map((file) => (
+                      {box.files.slice(0, 4).map((file: any) => (
                         <Card 
                           key={file.id}
                           className={`p-2 cursor-pointer hover:shadow-sm transition-shadow border ${getFileTypeColor(file.fileType)}`}
@@ -602,7 +602,7 @@ export default function FileGallery({ onUploadClick }: FileGalleryProps) {
                   
                   {/* Files Grid */}
                   <div className="grid grid-cols-2 gap-2 mt-4">
-                    {box.files.slice(0, 4).map((file) => (
+                    {box.files.slice(0, 4).map((file: any) => (
                       <Card 
                         key={file.id}
                         className={`p-2 cursor-pointer hover:shadow-sm transition-shadow border ${getFileTypeColor(file.fileType)}`}

@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('DEBUG: Raw users from storage:', users);
         console.log('DEBUG: Users is array?', Array.isArray(users));
       } catch (error) {
-        console.log('DEBUG: No users found, returning empty array:', error.message);
+        console.log('DEBUG: No users found, returning empty array:', (error as Error).message);
         return res.json([]);
       }
       
@@ -256,13 +256,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasPassword: !!user.passwordHash,
           lastLogin: user.lastLogin,
           createdAt: user.createdAt,
-          isActive: user.isActive === true || user.isActive === "true"
+          isActive: user.isActive === "true"
         }));
       console.log('DEBUG: Processed teams:', teams);
       res.json(teams);
     } catch (error) {
       console.error('DEBUG: Teams endpoint error:', error);
-      res.status(500).json({ message: "Failed to retrieve teams", error: error.message });
+      res.status(500).json({ message: "Failed to retrieve teams", error: (error as Error).message });
     }
   });
 
@@ -379,14 +379,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check what data exists first
-      let allFiles = [];
-      let allUsers = [];
+      let allFiles: any[] = [];
+      let allUsers: any[] = [];
       let hasAssignments = false;
 
       try {
         allFiles = await storage.getAllFiles();
       } catch (error) {
-        console.log('No files to delete or error fetching files:', error.message);
+        console.log('No files to delete or error fetching files:', (error as Error).message);
         allFiles = [];
       }
 
@@ -395,7 +395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Filter out admin from count
         allUsers = allUsers.filter(user => user.teamNumber !== 0);
       } catch (error) {
-        console.log('No users to delete or error fetching users:', error.message);
+        console.log('No users to delete or error fetching users:', (error as Error).message);
         allUsers = [];
       }
 
@@ -404,7 +404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignments = await storage.getAllAssignmentSettings();
         hasAssignments = assignments && assignments.length > 0;
       } catch (error) {
-        console.log('No assignment settings to reset or error fetching settings:', error.message);
+        console.log('No assignment settings to reset or error fetching settings:', (error as Error).message);
         hasAssignments = false;
       }
 
@@ -558,12 +558,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/assignment-settings", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      let settings = [];
+      let settings: any[] = [];
       
       try {
         settings = await storage.getAssignmentSettings();
       } catch (error) {
-        console.log('No assignment settings found, returning empty array:', error.message);
+        console.log('No assignment settings found, returning empty array:', (error as Error).message);
         settings = [];
       }
       
@@ -579,7 +579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error('Assignment settings error:', error);
-      res.status(500).json({ message: "Failed to retrieve assignment settings", error: error.message });
+      res.status(500).json({ message: "Failed to retrieve assignment settings", error: (error as Error).message });
     }
   });
   

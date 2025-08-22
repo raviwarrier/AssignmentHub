@@ -82,10 +82,16 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { 
-      ...insertUser, 
-      id, 
+      id,
+      teamNumber: insertUser.teamNumber,
+      teamName: insertUser.teamName || null,
+      passwordHash: insertUser.passwordHash || null,
       isAdmin: insertUser.isAdmin || "false",
-      lastLogin: new Date() 
+      isActive: insertUser.isActive || "true",
+      createdAt: new Date(),
+      lastLogin: new Date(),
+      passwordResetToken: null,
+      tokenExpiry: null
     };
     this.users.set(id, user);
     return user;
@@ -139,6 +145,7 @@ export class MemStorage implements IStorage {
       ...fileData,
       description: fileData.description ?? null,
       tags: fileData.tags ?? [],
+      isVisible: fileData.isVisible ?? "true",
       uploadedAt: new Date(),
     };
     this.files.set(id, file);
@@ -486,7 +493,7 @@ async function createStorage(): Promise<IStorage> {
   try {
     await storageInstance.initializeDefaultAssignmentSettings();
   } catch (error) {
-    console.log("Note: Could not initialize assignment settings:", error.message);
+    console.log("Note: Could not initialize assignment settings:", (error as Error).message);
   }
   
   return storageInstance;
