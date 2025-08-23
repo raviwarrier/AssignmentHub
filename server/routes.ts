@@ -45,13 +45,26 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: function (req, file, cb) {
-    const allowedTypes = ['.jpg', '.jpeg', '.png', '.pdf', '.docx', '.pptx'];
+    const allowedTypes = [
+      // Images
+      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg',
+      // Documents
+      '.pdf', '.doc', '.docx', '.txt', '.rtf',
+      // Spreadsheets
+      '.xls', '.xlsx', '.csv',
+      // Presentations
+      '.ppt', '.pptx',
+      // Archives
+      '.zip', '.rar', '.7z',
+      // Other common formats
+      '.json', '.xml', '.html', '.css', '.js', '.ts'
+    ];
     const ext = path.extname(file.originalname).toLowerCase();
     
     if (allowedTypes.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('File type not supported. Only JPG, PNG, PDF, DOCX, and PPTX files are allowed.'));
+      cb(new Error('File type not supported. Please check the supported file types in the upload interface.'));
     }
   }
 });

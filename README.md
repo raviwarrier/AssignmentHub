@@ -104,11 +104,15 @@ pm2 stop assignmenthub        # Stop application
 
 ## 📋 Supported File Types
 
-- **Documents**: PDF, DOCX
-- **Presentations**: PPTX  
-- **Images**: PNG, JPG, JPEG
-- **Spreadsheets**: XLSX
+- **Documents**: PDF, DOC, DOCX, TXT, RTF
+- **Presentations**: PPT, PPTX  
+- **Images**: PNG, JPG, JPEG, GIF, BMP, WebP, SVG
+- **Spreadsheets**: XLS, XLSX, CSV
+- **Archives**: ZIP, RAR, 7Z
+- **Code & Web**: JSON, XML, HTML, CSS, JS, TS
 - **File Size Limit**: 50MB per file
+
+The system now supports a comprehensive range of file types commonly used in academic and professional settings.
 
 ## 🔐 Security Features
 

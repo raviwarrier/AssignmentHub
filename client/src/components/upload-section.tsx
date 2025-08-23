@@ -86,7 +86,20 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
   });
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const allowedTypes = ['.jpg', '.jpeg', '.png', '.pdf', '.docx', '.pptx'];
+    const allowedTypes = [
+      // Images
+      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg',
+      // Documents
+      '.pdf', '.doc', '.docx', '.txt', '.rtf',
+      // Spreadsheets
+      '.xls', '.xlsx', '.csv',
+      // Presentations
+      '.ppt', '.pptx',
+      // Archives
+      '.zip', '.rar', '.7z',
+      // Other common formats
+      '.json', '.xml', '.html', '.css', '.js', '.ts'
+    ];
     const validFiles = acceptedFiles.filter(file => {
       const ext = '.' + file.name.split('.').pop()?.toLowerCase();
       return allowedTypes.includes(ext);
@@ -96,7 +109,7 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
       toast({
         variant: "destructive",
         title: "Invalid File Type",
-        description: "Only JPG, PNG, PDF, DOCX, and PPTX files are allowed.",
+        description: "Please check the supported file types list below.",
       });
     }
 
@@ -106,11 +119,37 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
+      // Images
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/png': ['.png'],
+      'image/gif': ['.gif'],
+      'image/bmp': ['.bmp'],
+      'image/webp': ['.webp'],
+      'image/svg+xml': ['.svg'],
+      // Documents
       'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt'],
+      'application/rtf': ['.rtf'],
+      // Spreadsheets
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'text/csv': ['.csv'],
+      // Presentations
+      'application/vnd.ms-powerpoint': ['.ppt'],
       'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+      // Archives
+      'application/zip': ['.zip'],
+      'application/x-rar-compressed': ['.rar'],
+      'application/x-7z-compressed': ['.7z'],
+      // Other common formats
+      'application/json': ['.json'],
+      'application/xml': ['.xml'],
+      'text/html': ['.html'],
+      'text/css': ['.css'],
+      'application/javascript': ['.js'],
+      'application/typescript': ['.ts']
     },
     maxSize: 50 * 1024 * 1024, // 50MB
   });
@@ -201,7 +240,9 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
             <h3 className="text-lg font-medium text-foreground mb-2">
               {isDragActive ? "Drop files here..." : "Drop files here or click to browse"}
             </h3>
-            <p className="text-muted-foreground mb-4">Supports JPG, PNG, PDF, DOCX, PPTX (Max 50MB)</p>
+            <p className="text-muted-foreground mb-4">
+              Supports images, documents, spreadsheets, presentations, archives, and code files (Max 50MB)
+            </p>
             <Button type="button" className="bg-primary text-primary-foreground hover:bg-primary/90">
               Choose Files
             </Button>
@@ -363,6 +404,42 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
               )}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+      
+      {/* Supported File Types */}
+      <Card>
+        <CardContent className="p-4">
+          <h3 className="font-medium text-foreground mb-3">Supported File Types</h3>
+          <div className="grid grid-cols-1 gap-3 text-sm">
+            <div>
+              <span className="font-medium text-foreground">Images:</span>
+              <span className="text-muted-foreground ml-2">JPG, JPEG, PNG, GIF, BMP, WebP, SVG</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Documents:</span>
+              <span className="text-muted-foreground ml-2">PDF, DOC, DOCX, TXT, RTF</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Spreadsheets:</span>
+              <span className="text-muted-foreground ml-2">XLS, XLSX, CSV</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Presentations:</span>
+              <span className="text-muted-foreground ml-2">PPT, PPTX</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Archives:</span>
+              <span className="text-muted-foreground ml-2">ZIP, RAR, 7Z</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Code & Web:</span>
+              <span className="text-muted-foreground ml-2">JSON, XML, HTML, CSS, JS, TS</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Maximum file size: 50MB per file
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -78,7 +78,7 @@ shared/             - Shared TypeScript definitions
   - `DATABASE_URL` for PostgreSQL connection
 
 ### File Management System
-- **Upload restrictions:** 50MB file size limit, specific file types (JPG, PNG, PDF, DOCX, PPTX)
+- **Upload restrictions:** 50MB file size limit, supports images (JPG, PNG, GIF, BMP, WebP, SVG), documents (PDF, DOC, DOCX, TXT, RTF), spreadsheets (XLS, XLSX, CSV), presentations (PPT, PPTX), archives (ZIP, RAR, 7Z), and code files (JSON, XML, HTML, CSS, JS, TS)
 - **Multer configuration:** Custom disk storage with timestamp-based unique filenames
 - **Permission system:** Students can only see their own files and files from "open view" assignments
 - **Storage location:** Files stored in `uploads/` directory with auto-generated unique names
@@ -129,6 +129,8 @@ ADMIN_PASSWORD=        # Admin login password
 - **Storage abstraction:** Interface-based storage with PostgreSQL/memory fallback
 - **Development tools:** Replit-specific plugins for enhanced development experience
 - **Authentication middleware:** `requireAuth` and `requireAdmin` helper functions for route protection
+- **Vite aliases:** `@` for client/src, `@shared` for shared/, `@assets` for attached_assets/
+- **Drizzle migrations:** Use `drizzle-kit push` to sync schema changes to database
 
 ## Testing & Production
 
@@ -159,3 +161,9 @@ ADMIN_PASSWORD=        # Admin login password
 **Environment file:**
 - Uses `AssignmentHub.env` (not `.env`) loaded via dotenv config path
 - Copy from `AssignmentHub.env.example` to get started
+- NOTE: Team passwords in env file are legacy - teams now self-register with chosen passwords
+
+**Windows Development:**
+- If `npm run dev` fails with "'NODE_ENV' is not recognized", use: `set NODE_ENV=development && npx tsx server/index.ts`
+- The npm script uses Unix-style environment variables that don't work on Windows Command Prompt
+- Alternative: Use PowerShell or Git Bash where Unix-style commands work
